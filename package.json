@@ -13,7 +13,8 @@
     "react-dom": "latest",
     "lucide-react": "latest",
     "clsx": "latest",
-    "tailwind-merge": "latest"
+    "tailwind-merge": "latest",
+    "firebase":"latest"
   },
   "devDependencies": {
     "autoprefixer": "latest",
