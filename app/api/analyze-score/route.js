@@ -1,17 +1,28 @@
 import { NextResponse } from 'next/server';
-import { AI_CONFIG } from '@/lib/constants'; // కాన్ఫిగ్ ఇంపోర్ట్
+import { AI_CONFIG } from '../../../lib/constants'; 
 
 export async function POST(req) {
   try {
     const { message, history, image } = await req.json();
     
-    // Choose model based on input type
+    // Choose model based on whether an image is provided
     const selectedModel = image ? AI_CONFIG.VISION_MODEL : AI_CONFIG.TEXT_MODEL;
 
-    const systemPrompt = `You are "ChillBoyz AI". 
-    1. Chat naturally. 
-    2. Wrap session data in START_DATA{...}END_DATA. 
-    3. Buy-in unit is $${AI_CONFIG.BUY_IN_AMOUNT}.`;
+    // Strong instructions for poker sheet analysis
+    const systemPrompt = `You are "ChillBoyz AI", a specialized Poker Assistant for KT's group.
+    
+    CORE LOGIC:
+    1. Buy-in unit is $${AI_CONFIG.BUY_IN_AMOUNT}.
+    2. IMAGE ANALYSIS: Look for player names. Count the number of "20"s or checkmarks next to them.
+    3. THE LINE RULE: If you see a horizontal line drawn after the buy-ins, the number immediately following that line is the player's FINAL CASHOUT.
+    4. NET CALCULATION: Net = Cashout - (Buyins * ${AI_CONFIG.BUY_IN_AMOUNT}).
+    
+    RESPONSE FORMAT:
+    - Reply naturally in text.
+    - If you identify session data or are asked to start a session, you MUST append the data at the end of your reply in this EXACT format:
+      START_DATA{"players": [{"name": "PlayerName", "buyins": 2, "cashout": 150}]}END_DATA
+    
+    Keep the tone friendly and use "మామ" (Mama) occasionally as you are a close assistant to KT.`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -19,7 +30,10 @@ export async function POST(req) {
       { 
         role: "user", 
         content: image 
-          ? [{ type: "text", text: message || "Analyze sheet" }, { type: "image_url", image_url: { url: image } }] 
+          ? [
+              { type: "text", text: message || "Please analyze this poker score sheet." },
+              { type: "image_url", image_url: { url: image } }
+            ] 
           : message 
       }
     ];
@@ -33,20 +47,26 @@ export async function POST(req) {
       body: JSON.stringify({
         model: selectedModel,
         messages: messages,
-        temperature: 0.5
+        temperature: 0.2, // Lower temperature for more accurate data extraction
+        max_tokens: 1024
       })
     });
 
     const result = await response.json();
-    
+
     if (result.error) {
-       // ఒకవేళ మోడల్ ఎర్రర్ వస్తే మనకి క్లియర్ గా తెలుస్తుంది
-       console.error("Groq Model Error:", result.error.message);
-       return NextResponse.json({ error: `Model Issue: ${result.error.message}` }, { status: 500 });
+      console.error("Groq API Error:", result.error);
+      return NextResponse.json({ error: result.error.message }, { status: 500 });
+    }
+
+    if (!result.choices || result.choices.length === 0) {
+      return NextResponse.json({ error: "No response from AI model" }, { status: 500 });
     }
 
     return NextResponse.json({ reply: result.choices[0].message.content });
+
   } catch (error) {
-    return NextResponse.json({ error: "Server Error" }, { status: 500 });
+    console.error("Server Crash:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
