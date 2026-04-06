@@ -3,18 +3,17 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, PlayCircle, History, 
   Plus, Minus, Share2, CheckCircle2, 
-  UserPlus, Save, X, PlusCircle, UserCheck
+  UserPlus, Save, X, PlusCircle, TrendingUp
 } from 'lucide-react';
 
 export default function SSCOmniApp() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isLive, setIsLive] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
   const [showOnboardModal, setShowOnboardModal] = useState(false);
   const [newPlayerName, setNewPlayerName] = useState('');
   const BUY_IN = 20;
 
-  // 1. Persistent Roster with LocalStorage
+  // 1. Dynamic Roster with LocalStorage
   const [roster, setRoster] = useState([]);
   const [activePlayers, setActivePlayers] = useState([]);
 
@@ -24,9 +23,9 @@ export default function SSCOmniApp() {
     if (savedRoster) {
       setRoster(JSON.parse(savedRoster));
     } else {
-      // Default initial users
+      // Default initial users if none exist
       const initial = ['KT', 'Chaitanya', 'Prasad', 'Guru', 'Arveen', 'Mallela'].map(name => ({
-        id: crypto.randomUUID(),
+        id: Math.random().toString(36).substr(2, 9),
         name: name
       }));
       setRoster(initial);
@@ -34,11 +33,11 @@ export default function SSCOmniApp() {
     }
   }, []);
 
-  // Onboard New Player
+  // Onboard New Player and Save to Roster
   const handleOnboard = () => {
     if (!newPlayerName.trim()) return;
     const newPlayer = {
-      id: crypto.randomUUID(),
+      id: Math.random().toString(36).substr(2, 9),
       name: newPlayerName.trim()
     };
     const updatedRoster = [...roster, newPlayer];
@@ -62,31 +61,35 @@ export default function SSCOmniApp() {
       <header className="p-6 flex justify-between items-center border-b border-white/5 sticky top-0 bg-black/80 backdrop-blur-xl z-[100]">
         <div>
           <h1 className="text-xl font-black italic tracking-tighter">SSC SCORE</h1>
-          <p className="text-[8px] text-zinc-500 tracking-[4px]">V5.0 DYNAMIC SYSTEM</p>
+          <p className="text-[8px] text-zinc-500 tracking-[4px]">V5.1 PRODUCTION</p>
         </div>
         <button 
           onClick={() => setShowOnboardModal(true)}
-          className="bg-white/5 p-2 rounded-xl border border-white/10 active:scale-95 transition-all"
+          className="bg-zinc-900 p-2 rounded-xl border border-white/10 active:scale-95 transition-all flex items-center gap-2 px-3"
         >
-          <UserPlus size={20} className="text-green-400" />
+          <UserPlus size={18} className="text-green-400" />
+          <span className="text-[10px] font-black uppercase">Onboard</span>
         </button>
       </header>
 
       <main className="p-4 max-w-md mx-auto">
         {/* --- DASHBOARD --- */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="bg-gradient-to-br from-zinc-900 to-black p-6 rounded-[2.5rem] border border-white/10 shadow-2xl text-center py-12">
-              <TrendingUp size={40} className="mx-auto mb-4 text-zinc-700" />
+              <TrendingUp size={40} className="mx-auto mb-4 text-green-500/50" />
               <h3 className="text-zinc-500 text-[10px] font-black tracking-widest uppercase mb-2">Total Group Strength</h3>
               <p className="text-4xl font-black">{roster.length} Players</p>
+            </div>
+            <div className="bg-zinc-900/40 p-4 rounded-3xl border border-white/5 italic text-center text-xs text-zinc-500">
+              Go to Session tab to start a game
             </div>
           </div>
         )}
 
         {/* --- LIVE SESSION --- */}
         {activeTab === 'live' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
             {!isLive ? (
               <div className="space-y-6">
                 <div className="bg-zinc-900/50 p-6 rounded-[2.5rem] border border-white/5">
@@ -101,7 +104,7 @@ export default function SSCOmniApp() {
                         onClick={() => togglePlayer(p)} 
                         className={`p-5 rounded-2xl font-bold border-2 transition-all active:scale-95 ${
                           activePlayers.find(ap => ap.id === p.id) 
-                          ? 'bg-white text-black border-white shadow-lg' 
+                          ? 'bg-white text-black border-white shadow-lg shadow-white/10' 
                           : 'bg-zinc-900 border-transparent text-zinc-600'
                         }`}
                       >
@@ -113,7 +116,7 @@ export default function SSCOmniApp() {
                 <button 
                   onClick={() => setIsLive(true)} 
                   disabled={activePlayers.length === 0}
-                  className="w-full bg-green-500 text-black py-5 rounded-2xl font-black shadow-xl shadow-green-500/20 active:scale-95 disabled:opacity-20"
+                  className="w-full bg-[#22C55E] text-black py-5 rounded-2xl font-black shadow-xl shadow-green-500/20 active:scale-95 disabled:opacity-20 transition-all"
                 >
                   START SESSION
                 </button>
@@ -150,7 +153,7 @@ export default function SSCOmniApp() {
                 <div className="grid grid-cols-2 gap-3 pt-6 pb-10">
                   <button className="bg-zinc-800 p-5 rounded-2xl font-black flex items-center justify-center gap-2 active:scale-95 transition-all"><Save size={18}/> SAVE</button>
                   <button className="bg-green-600 p-5 rounded-2xl font-black flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-green-600/20"><Share2 size={18}/> SHARE</button>
-                  <button onClick={() => {setIsLive(false); setActivePlayers([])}} className="col-span-2 bg-red-900/10 text-red-500 p-4 rounded-2xl font-bold text-xs">ABORT SESSION</button>
+                  <button onClick={() => {setIsLive(false); setActivePlayers([])}} className="col-span-2 bg-red-900/10 text-red-500 p-4 rounded-2xl font-bold text-xs mt-4">ABORT SESSION</button>
                 </div>
               </div>
             )}
@@ -159,7 +162,9 @@ export default function SSCOmniApp() {
 
         {/* --- HISTORY --- */}
         {activeTab === 'history' && (
-          <div className="py-20 text-center text-zinc-600 font-bold italic">History coming soon...</div>
+          <div className="py-20 text-center text-zinc-600 font-bold italic animate-in fade-in">
+            History feature coming soon...
+          </div>
         )}
       </main>
 
@@ -168,13 +173,13 @@ export default function SSCOmniApp() {
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300">
           <div className="w-full bg-zinc-900 border border-white/10 p-8 rounded-[3rem] shadow-2xl">
             <h3 className="text-2xl font-black italic mb-2 tracking-tighter">ONBOARD PLAYER</h3>
-            <p className="text-zinc-500 text-xs mb-6 uppercase tracking-widest">Assigning Internal Player ID...</p>
+            <p className="text-zinc-500 text-[10px] mb-6 uppercase tracking-widest">Adding to permanent roster...</p>
             <input 
               autoFocus
               type="text" 
               value={newPlayerName}
               onChange={(e) => setNewPlayerName(e.target.value)}
-              placeholder="Enter Full Name" 
+              placeholder="Enter Player Name" 
               className="w-full bg-black border border-white/10 p-5 rounded-2xl font-bold focus:border-green-500 outline-none mb-4 transition-all"
             />
             <div className="flex gap-2">
@@ -187,21 +192,18 @@ export default function SSCOmniApp() {
 
       {/* --- BOTTOM NAV --- */}
       <nav className="fixed bottom-0 left-0 right-0 bg-zinc-900/90 backdrop-blur-2xl border-t border-white/5 px-8 py-4 pb-10 flex justify-between items-center z-[150]">
-        <NavIcon icon={<LayoutDashboard size={20}/>} label="DASH" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
-        <button onClick={() => setActiveTab('live')} className={`p-5 rounded-[2rem] transition-all -translate-y-6 shadow-2xl ${activeTab === 'live' ? 'bg-green-500 text-black shadow-green-500/40' : 'bg-zinc-800 text-zinc-500'}`}>
+        <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'dashboard' ? 'text-green-400' : 'text-zinc-600'}`}>
+          <LayoutDashboard size={20}/>
+          <span className="text-[8px] font-black tracking-[2px]">DASH</span>
+        </button>
+        <button onClick={() => setActiveTab('live')} className={`p-5 rounded-[2rem] transition-all -translate-y-6 shadow-2xl ${activeTab === 'live' ? 'bg-green-500 text-black shadow-green-500/40 border-4 border-black' : 'bg-zinc-800 text-zinc-500'}`}>
           <PlayCircle size={28}/>
         </button>
-        <NavIcon icon={<History size={20}/>} label="HIST" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
+        <button onClick={() => setActiveTab('history')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'history' ? 'text-green-400' : 'text-zinc-600'}`}>
+          <History size={20}/>
+          <span className="text-[8px] font-black tracking-[2px]">HIST</span>
+        </button>
       </nav>
     </div>
-  );
-}
-
-function NavIcon({ icon, label, active, onClick }) {
-  return (
-    <button onClick={onClick} className={`flex flex-col items-center gap-1 transition-all ${active ? 'text-green-400' : 'text-zinc-600'}`}>
-      {icon}
-      <span className="text-[8px] font-black tracking-[2px]">{label}</span>
-    </button>
   );
 }
