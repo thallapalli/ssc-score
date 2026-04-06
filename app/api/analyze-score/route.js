@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
+import { AI_CONFIG } from '@/lib/constants'; // కాన్ఫిగ్ ఇంపోర్ట్
 
 export async function POST(req) {
   try {
     const { message, history, image } = await req.json();
     
-    const systemPrompt = `You are "ChillBoyz AI", KT's poker assistant. 
-    1. Chat naturally with the user.
-    2. If providing session data (players/scores), always wrap it EXACTLY like this: 
-       START_DATA{"players": [{"name": "Name", "buyins": 1, "cashout": 0}]}END_DATA
-    3. Buy-in is $20. Identify players/scores from text or images.`;
+    // Choose model based on input type
+    const selectedModel = image ? AI_CONFIG.VISION_MODEL : AI_CONFIG.TEXT_MODEL;
+
+    const systemPrompt = `You are "ChillBoyz AI". 
+    1. Chat naturally. 
+    2. Wrap session data in START_DATA{...}END_DATA. 
+    3. Buy-in unit is $${AI_CONFIG.BUY_IN_AMOUNT}.`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -16,7 +19,7 @@ export async function POST(req) {
       { 
         role: "user", 
         content: image 
-          ? [{ type: "text", text: message || "Analyze this" }, { type: "image_url", image_url: { url: image } }] 
+          ? [{ type: "text", text: message || "Analyze sheet" }, { type: "image_url", image_url: { url: image } }] 
           : message 
       }
     ];
@@ -28,18 +31,22 @@ export async function POST(req) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: image ? "llama-3.2-11b-vision-preview" : "llama-3.3-70b-versatile",
+        model: selectedModel,
         messages: messages,
         temperature: 0.5
       })
     });
 
     const result = await response.json();
-    if (!result.choices) throw new Error(result.error?.message || "Groq Error");
+    
+    if (result.error) {
+       // ఒకవేళ మోడల్ ఎర్రర్ వస్తే మనకి క్లియర్ గా తెలుస్తుంది
+       console.error("Groq Model Error:", result.error.message);
+       return NextResponse.json({ error: `Model Issue: ${result.error.message}` }, { status: 500 });
+    }
 
     return NextResponse.json({ reply: result.choices[0].message.content });
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: "Server Error" }, { status: 500 });
   }
 }
