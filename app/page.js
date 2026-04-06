@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, writeBatch } from 'firebase/firestore';
-import { LayoutDashboard, PlayCircle, History, UserPlus, Wallet, TrendingUp, Clock, AlertCircle } from 'lucide-react';
+import { LayoutDashboard, PlayCircle, History, UserPlus, TrendingUp, Clock, Share2 } from 'lucide-react';
 
 const BUY_IN_UNIT = 20;
 
@@ -41,25 +41,46 @@ export default function SSCScoreFinal() {
     return Object.entries(stats).sort((a, b) => b[1].net - a[1].net);
   };
 
-  // FIXED: Added defensive checks for timestamp to prevent crash
   const getGroupedHistory = () => {
     const groups = {};
     [...history].reverse().forEach(session => {
-      // If timestamp is not yet available from Firebase, use current date as fallback
       const dateObj = session.timestamp ? session.timestamp.toDate() : new Date();
       const dateKey = dateObj.toLocaleDateString();
-      
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(session);
     });
     return groups;
   };
 
-  const handleOnboard = async () => {
-    if (!newPlayerName.trim()) return;
-    await addDoc(collection(db, 'roster'), { name: newPlayerName.trim(), createdAt: serverTimestamp() });
-    setNewPlayerName(''); setShowOnboardModal(false);
+  // --- WHATSAPP SHARING LOGIC ---
+  const shareToWhatsApp = (text) => {
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
   };
+
+  const shareCurrentGame = () => {
+    const date = new Date().toLocaleDateString();
+    let message = `*🃏 SSC SCORE - Session Report*\n📅 Date: ${date}\n\n`;
+    activePlayers.forEach(p => {
+      const net = Number(p.cashout) - (p.buyins * BUY_IN_UNIT);
+      message += `👤 *${p.name}*\n   In: $${p.buyins * BUY_IN_UNIT} | Net: ${net >= 0 ? '+$' : '-$'}${Math.abs(net)}\n`;
+    });
+    message += `\n#PokerNight #SSCScore`;
+    shareToWhatsApp(message);
+  };
+
+  const shareSeasonStandings = () => {
+    const stats = getUnsettledStats();
+    if (stats.length === 0) return alert("No unsettled data to share!");
+    
+    let message = `*🏆 SSC SCORE - Season Standings*\n📊 Unsettled Sessions\n\n`;
+    stats.forEach(([name, data]) => {
+      message += `${data.net >= 0 ? '✅' : '🔴'} *${name}*: ${data.net >= 0 ? '+$' : '-$'}${Math.abs(data.net.toFixed(0))} (In: $${data.totalBuyIn})\n`;
+    });
+    message += `\n🔗 Keep Grinding!`;
+    shareToWhatsApp(message);
+  };
+  // ------------------------------
 
   const handleSaveSession = async (resolutionType = 'none') => {
     let finalPlayers = [...activePlayers];
@@ -89,10 +110,7 @@ export default function SSCScoreFinal() {
     };
 
     await addDoc(collection(db, 'sessions'), sessionData);
-    setIsLive(false); 
-    setActivePlayers([]); 
-    setShowSettleModal(false); 
-    setActiveTab('history'); // Automatically switch to history
+    setIsLive(false); setActivePlayers([]); setShowSettleModal(false); setActiveTab('history');
   };
 
   const batchSettleAll = async () => {
@@ -125,9 +143,14 @@ export default function SSCScoreFinal() {
                 <TrendingUp size={16} color="#C9A84C" />
                 <span style={{ fontSize: '12px', color: '#8A8070', fontWeight: 'bold' }}>UNSETTLED SEASON</span>
               </div>
-              {getUnsettledStats().length > 0 && (
-                <button onClick={batchSettleAll} style={{ background: '#C9A84C', color: '#000', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold', border: 'none' }}>SETTLE ALL</button>
-              )}
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={shareSeasonStandings} style={{ background: '#25D366', color: '#fff', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold', border: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Share2 size={12} /> STANDINGS
+                </button>
+                {getUnsettledStats().length > 0 && (
+                  <button onClick={batchSettleAll} style={{ background: '#C9A84C', color: '#000', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold', border: 'none' }}>SETTLE ALL</button>
+                )}
+              </div>
             </div>
             {getUnsettledStats().map(([name, data]) => (
               <div key={name} style={{ background: '#111', padding: '16px', borderRadius: '15px', marginBottom: '12px', border: '1px solid #222' }}>
@@ -174,10 +197,13 @@ export default function SSCScoreFinal() {
                         <button onClick={() => { let a = [...activePlayers]; a[i].buyins++; setActivePlayers(a); }} style={{ color: '#C9A84C', fontSize: '20px', background: 'none', border: 'none' }}>+</button>
                       </div>
                     </div>
-                    <input type="number" placeholder="Cashout amount" onChange={e => { let a = [...activePlayers]; a[i].cashout = e.target.value; setActivePlayers(a); }} style={{ width: '100%', background: '#000', border: '1px solid #333', padding: '12px', borderRadius: '10px', color: 'white' }} />
+                    <input type="number" placeholder="Cashout" onChange={e => { let a = [...activePlayers]; a[i].cashout = e.target.value; setActivePlayers(a); }} style={{ width: '100%', background: '#000', border: '1px solid #333', padding: '12px', borderRadius: '10px', color: 'white' }} />
                   </div>
                 ))}
-                <button onClick={() => Math.abs(totalNet) < 0.1 ? handleSaveSession() : setShowSettleModal(true)} style={{ padding: '20px', background: '#C9A84C', color: '#000', borderRadius: '15px', fontWeight: 'bold', border: 'none' }}>END SESSION</button>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: '10px' }}>
+                  <button onClick={shareCurrentGame} style={{ padding: '20px', background: '#25D366', borderRadius: '15px', border: 'none' }}><Share2 color="white" /></button>
+                  <button onClick={() => Math.abs(totalNet) < 0.1 ? handleSaveSession() : setShowSettleModal(true)} style={{ padding: '20px', background: '#C9A84C', color: '#000', borderRadius: '15px', fontWeight: 'bold', border: 'none' }}>END & SAVE</button>
+                </div>
               </div>
             )}
           </div>
@@ -185,32 +211,28 @@ export default function SSCScoreFinal() {
 
         {activeTab === 'history' && (
           <div>
-            {Object.keys(groupedHistory).length === 0 ? (
-              <div style={{ textAlign: 'center', marginTop: '40px', opacity: 0.5 }}>No history yet.</div>
-            ) : (
-              Object.keys(groupedHistory).reverse().map(date => (
-                <div key={date} style={{ marginBottom: '25px' }}>
-                  <div style={{ fontSize: '13px', color: '#C9A84C', fontWeight: 'bold', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Clock size={14} /> {date}
-                  </div>
-                  {groupedHistory[date].map((session, idx) => (
-                    <div key={session.id || idx} style={{ background: '#111', padding: '16px', borderRadius: '15px', marginBottom: '10px', borderLeft: session.status === 'unsettled' ? '4px solid #C9A84C' : '4px solid #27AE60' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
-                        <span style={{ fontWeight: 'bold' }}>Game {idx + 1}</span>
-                        <span style={{ fontSize: '10px', opacity: 0.5 }}>{session.status?.toUpperCase()}</span>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        {session.players?.map(p => (
-                          <div key={p.name} style={{ fontSize: '12px', color: '#8A8070' }}>
-                            {p.name}: <span style={{ color: (p.net || 0) >= 0 ? '#5DD88A' : '#E74C3C' }}>{(p.net || 0) >= 0 ? '+' : ''}{(p.net || 0).toFixed(0)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+            {Object.keys(groupedHistory).reverse().map(date => (
+              <div key={date} style={{ marginBottom: '25px' }}>
+                <div style={{ fontSize: '13px', color: '#C9A84C', fontWeight: 'bold', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Clock size={14} /> {date}
                 </div>
-              ))
-            )}
+                {groupedHistory[date].map((session, idx) => (
+                  <div key={session.id} style={{ background: '#111', padding: '16px', borderRadius: '15px', marginBottom: '10px', borderLeft: session.status === 'unsettled' ? '4px solid #C9A84C' : '4px solid #27AE60' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
+                      <span style={{ fontWeight: 'bold' }}>Game {idx + 1}</span>
+                      <span style={{ fontSize: '10px', opacity: 0.5 }}>{session.status?.toUpperCase()}</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      {session.players?.map(p => (
+                        <div key={p.name} style={{ fontSize: '12px', color: '#8A8070' }}>
+                          {p.name}: <span style={{ color: (p.net || 0) >= 0 ? '#5DD88A' : '#E74C3C' }}>{(p.net || 0) >= 0 ? '+' : ''}{(p.net || 0).toFixed(0)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         )}
       </main>
@@ -226,7 +248,6 @@ export default function SSCScoreFinal() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 }}>
           <div style={{ background: '#111', padding: '25px', borderRadius: '20px', width: '100%', maxWidth: '400px' }}>
             <h3 style={{ color: '#E74C3C', marginTop: 0 }}>Mismatch!</h3>
-            <p>Difference: ${totalNet.toFixed(2)}</p>
             <button onClick={() => handleSaveSession('split_equal')} style={{ width: '100%', padding: '15px', margin: '8px 0', background: '#222', borderRadius: '12px', color: 'white' }}>Split Equally</button>
             <button onClick={() => handleSaveSession('split_positives')} style={{ width: '100%', padding: '15px', margin: '8px 0', background: '#222', borderRadius: '12px', color: 'white' }}>Split to Winners</button>
             <button onClick={() => setShowSettleModal(false)} style={{ width: '100%', padding: '15px', margin: '8px 0', background: '#C9A84C', color: '#000', borderRadius: '12px', fontWeight: 'bold' }}>Re-edit Scores</button>
@@ -237,11 +258,11 @@ export default function SSCScoreFinal() {
       {showOnboardModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 }}>
           <div style={{ background: '#111', padding: '25px', borderRadius: '20px', width: '100%', maxWidth: '400px' }}>
-            <h3 style={{ marginTop: 0 }}>Add New Player</h3>
-            <input value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} placeholder="Player name" style={{ width: '100%', padding: '15px', background: '#000', border: '1px solid #333', color: 'white', borderRadius: '12px', marginBottom: '20px' }} />
+            <h3>Add Player</h3>
+            <input value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} placeholder="Name" style={{ width: '100%', padding: '15px', background: '#000', color: 'white', borderRadius: '12px', marginBottom: '20px' }} />
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => setShowOnboardModal(false)} style={{ flex: 1, padding: '12px', background: '#222', borderRadius: '10px', color: 'white' }}>Cancel</button>
-              <button onClick={handleOnboard} style={{ flex: 1, padding: '12px', background: '#C9A84C', borderRadius: '10px', color: '#000', fontWeight: 'bold' }}>Add Player</button>
+              <button onClick={handleOnboard} style={{ flex: 1, padding: '12px', background: '#C9A84C', borderRadius: '10px', color: '#000', fontWeight: 'bold' }}>Add</button>
             </div>
           </div>
         </div>
