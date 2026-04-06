@@ -10,6 +10,14 @@
   "dependencies": {
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "lucide-react": "latest",
+    "firebase": "latest",
+    "clsx": "latest",
+    "tailwind-merge": "latest"
+  },
+  "devDependencies": {
+    "postcss": "^8",
+    "tailwindcss": "^3"
   }
 }
