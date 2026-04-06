@@ -21,6 +21,7 @@ export default function SSCOmniApp() {
   const [activePlayers, setActivePlayers] = useState([]);
   const BUY_IN = 20;
 
+  // Real-time listener for Firebase
   useEffect(() => {
     const qRoster = query(collection(db, 'roster'), orderBy('name', 'asc'));
     const unsubRoster = onSnapshot(qRoster, snap =>
@@ -76,17 +77,17 @@ export default function SSCOmniApp() {
   };
 
   const standings = getOverallStandings();
-
-  const gold = { fontFamily: "'Playfair Display', serif" };
-  const mono = { fontFamily: "'DM Mono', monospace" };
+  const gold = { fontFamily: "system-ui, -apple-system, sans-serif" }; // Using system fonts to ensure it works everywhere
+  const mono = { fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#080808', paddingBottom: '140px', position: 'relative', zIndex: 1 }}>
-
+    <div style={{ minHeight: '100vh', background: '#080808', color: 'white', paddingBottom: '140px', position: 'relative' }}>
+      
+      {/* HEADER */}
       <header style={{ position: 'sticky', top: 0, zIndex: 100, padding: '16px 20px', background: 'rgba(8,8,8,0.95)', backdropFilter: 'blur(24px)', borderBottom: '1px solid rgba(201,168,76,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-            <h1 style={{ ...gold, fontSize: '26px', fontWeight: 900, fontStyle: 'italic', background: 'linear-gradient(135deg, #E8C96B, #C9A84C, #8A6E2F)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', margin: 0 }}>SSC</h1>
+            <h1 style={{ ...gold, fontSize: '26px', fontWeight: 900, fontStyle: 'italic', background: 'linear-gradient(135deg, #E8C96B, #C9A84C, #8A6E2F)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>SSC</h1>
             <span style={{ ...gold, fontSize: '14px', color: 'rgba(201,168,76,0.5)', fontStyle: 'italic' }}>Score</span>
           </div>
           <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
@@ -103,25 +104,26 @@ export default function SSCOmniApp() {
 
       <main style={{ padding: '20px 16px', maxWidth: '480px', margin: '0 auto' }}>
 
+        {/* DASHBOARD / STANDINGS */}
         {activeTab === 'dashboard' && (
-          <div className="animate-fade-up">
+          <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
               <div style={{ width: '3px', height: '18px', borderRadius: '2px', background: 'linear-gradient(180deg, #E8C96B, #C9A84C)' }} />
               <span style={{ ...gold, fontSize: '11px', letterSpacing: '0.2em', color: '#8A8070', textTransform: 'uppercase' }}>All-Time Standings</span>
             </div>
 
             {standings.length >= 3 && (
-              <div className="animate-fade-up-delay-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '16px', alignItems: 'end' }}>
                 {[standings[1], standings[0], standings[2]].map((entry, podiumIdx) => {
                   const actualRank = podiumIdx === 0 ? 1 : podiumIdx === 1 ? 0 : 2;
                   const [name, net] = entry;
                   const meta = RANK_META[actualRank];
                   const isChamp = actualRank === 0;
                   return (
-                    <div key={name} className={isChamp ? 'float-anim' : ''} style={{ background: isChamp ? 'linear-gradient(135deg, rgba(201,168,76,0.12), rgba(28,28,28,0.95))' : 'rgba(20,20,20,0.9)', border: isChamp ? '1px solid rgba(201,168,76,0.3)' : '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '16px 8px', textAlign: 'center', marginTop: isChamp ? '0' : '12px', boxShadow: isChamp ? '0 8px 32px rgba(201,168,76,0.1)' : 'none' }}>
+                    <div key={name} style={{ background: isChamp ? 'linear-gradient(135deg, rgba(201,168,76,0.12), rgba(28,28,28,0.95))' : 'rgba(20,20,20,0.9)', border: isChamp ? '1px solid rgba(201,168,76,0.3)' : '1px solid rgba(255,255,255,0.05)', borderRadius: '20px', padding: '16px 8px', textAlign: 'center', boxShadow: isChamp ? '0 8px 32px rgba(201,168,76,0.1)' : 'none' }}>
                       <div style={{ fontSize: '20px', marginBottom: '4px' }}>{meta.medal}</div>
                       <div style={{ ...gold, fontSize: '13px', fontWeight: 700, color: '#F0EAD6', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
-                      <div style={{ ...mono, fontSize: '14px', fontWeight: 600, marginTop: '4px', color: net >= 0 ? '#5DD88A' : '#E74C3C' }}>{net >= 0 ? '+' : ''}{net}</div>
+                      <div style={{ ...mono, fontSize: '14px', fontWeight: 600, marginTop: '4px', color: net >= 0 ? '#5DD88A' : '#E74C3C' }}>{net >= 0 ? '+' : ''}{net.toFixed(0)}</div>
                       <div style={{ fontSize: '7px', color: meta.color, letterSpacing: '0.1em', marginTop: '3px', opacity: 0.7 }}>{meta.label}</div>
                     </div>
                   );
@@ -129,50 +131,105 @@ export default function SSCOmniApp() {
               </div>
             )}
 
-            <div className="animate-fade-up-delay-2" style={{ background: 'linear-gradient(135deg, rgba(20,20,20,0.9), rgba(12,12,12,0.95))', border: '1px solid rgba(201,168,76,0.08)', borderRadius: '24px', overflow: 'hidden', marginBottom: '16px' }}>
+            <div style={{ background: 'linear-gradient(135deg, rgba(20,20,20,0.9), rgba(12,12,12,0.95))', border: '1px solid rgba(201,168,76,0.08)', borderRadius: '24px', overflow: 'hidden' }}>
               {standings.map(([name, net], i) => (
-                <div key={name} style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: i < standings.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', background: i === 0 ? 'linear-gradient(90deg, rgba(201,168,76,0.04), transparent)' : 'transparent' }}>
+                <div key={name} style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: i < standings.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                    <span style={{ ...mono, fontSize: '11px', color: i === 0 ? '#C9A84C' : i === 1 ? '#909090' : i === 2 ? '#CD7F32' : '#3A3530', width: '16px', textAlign: 'center' }}>
-                      {i === 0 ? '♛' : i === 1 ? '♜' : i === 2 ? '♞' : i + 1}
-                    </span>
+                    <span style={{ ...mono, fontSize: '11px', color: i < 3 ? RANK_META[i].color : '#3A3530', width: '16px', textAlign: 'center' }}>{i + 1}</span>
                     <div>
                       <div style={{ ...gold, fontSize: '16px', fontWeight: 700, color: i === 0 ? '#F0EAD6' : '#8A8070' }}>{name}</div>
-                      <div style={{ fontSize: '9px', color: '#3A3530', letterSpacing: '0.1em' }}>
-                        {history.filter(s => s.players?.some(p => p.name === name)).length} sessions
-                      </div>
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ ...mono, fontSize: '18px', fontWeight: 600, color: net > 0 ? '#5DD88A' : net < 0 ? '#E74C3C' : '#4A4540' }}>{net > 0 ? '+' : ''}{net}</div>
-                    {net !== 0 && <div style={{ fontSize: '8px', color: net > 0 ? 'rgba(93,216,138,0.4)' : 'rgba(231,76,60,0.4)', letterSpacing: '0.1em' }}>{net > 0 ? 'PROFIT' : 'DEFICIT'}</div>}
-                  </div>
+                  <div style={{ ...mono, fontSize: '18px', fontWeight: 600, color: net >= 0 ? '#5DD88A' : '#E74C3C' }}>{net >= 0 ? '+' : ''}{net.toFixed(0)}</div>
                 </div>
               ))}
             </div>
+          </div>
+        )}
 
-            {history.length > 0 && (
-              <div className="animate-fade-up-delay-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                {[
-                  { label: 'Sessions', value: history.length, icon: '♠' },
-                  { label: 'Total Pot', value: '$' + history.reduce((a, s) => a + (s.totalPot || 0), 0), icon: '♦' },
-                  { label: 'Players', value: roster.length, icon: '♣' },
-                ].map(({ label, value, icon }) => (
-                  <div key={label} style={{ background: 'rgba(20,20,20,0.8)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '16px', padding: '14px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '16px', marginBottom: '4px', opacity: 0.25 }}>{icon}</div>
-                    <div style={{ ...mono, fontSize: '15px', fontWeight: 600, color: '#F0EAD6' }}>{value}</div>
-                    <div style={{ fontSize: '8px', color: '#4A4540', letterSpacing: '0.1em', marginTop: '2px' }}>{label.toUpperCase()}</div>
+        {/* LIVE SESSION */}
+        {activeTab === 'live' && (
+          <div>
+            {!isLive ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  {roster.map(p => {
+                    const selected = activePlayers.find(ap => ap.id === p.id);
+                    return (
+                      <button key={p.id} onClick={() => {
+                        if (selected) setActivePlayers(activePlayers.filter(ap => ap.id !== p.id));
+                        else setActivePlayers([...activePlayers, { ...p, buyins: 1, cashout: 0 }]);
+                      }} style={{ padding: '18px', borderRadius: '18px', background: selected ? 'linear-gradient(135deg, #E8C96B, #C9A84C)' : 'rgba(20,20,20,0.5)', border: '1px solid rgba(255,255,255,0.06)', color: selected ? '#1A0F00' : '#4A4540', cursor: 'pointer' }}>
+                        {p.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button onClick={() => setIsLive(true)} disabled={activePlayers.length === 0} style={{ padding: '20px', borderRadius: '20px', background: 'linear-gradient(135deg, #1E4A35, #27AE60)', color: 'white', fontWeight: 900, cursor: 'pointer' }}>Deal Cards</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ padding: '12px', borderRadius: '16px', background: Math.abs(totalNet) < 0.1 ? 'rgba(26,58,42,0.9)' : 'rgba(44,20,16,0.9)', textAlign: 'center' }}>
+                  <div style={{ ...mono, fontSize: '20px', color: Math.abs(totalNet) < 0.1 ? '#5DD88A' : '#E74C3C' }}>Net: ${totalNet.toFixed(2)}</div>
+                </div>
+                {activePlayers.map((p, i) => (
+                  <div key={p.id} style={{ background: '#111', borderRadius: '24px', padding: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                      <span style={{ fontSize: '20px', fontWeight: 700 }}>{p.name}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <button onClick={() => { let a = [...activePlayers]; a[i].buyins = Math.max(1, a[i].buyins - 1); setActivePlayers(a); }} style={{ color: '#8A8070' }}>−</button>
+                        <span style={{ color: '#C9A84C' }}>{p.buyins}</span>
+                        <button onClick={() => { let a = [...activePlayers]; a[i].buyins++; setActivePlayers(a); }} style={{ color: '#8A8070' }}>+</button>
+                      </div>
+                    </div>
+                    <input type="number" placeholder="Cash out" onChange={e => { let a = [...activePlayers]; a[i].cashout = e.target.value; setActivePlayers(a); }} style={{ width: '100%', background: '#000', border: '1px solid #333', padding: '12px', borderRadius: '12px', color: 'white' }} />
                   </div>
                 ))}
+                <button onClick={handleSaveSession} style={{ padding: '20px', borderRadius: '20px', background: '#C9A84C', color: 'black', fontWeight: 900 }}>Settle Session</button>
               </div>
             )}
           </div>
         )}
 
-        {activeTab === 'live' && (
-          <div className="animate-fade-up">
-            {!isLive ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ width: '3px', height: '18px', borderRadius: '2px', background: 'linear-gradient(180deg, #5DD88A, #27AE60)' }} />
-                  <span style={{ ...gold, fontSize: '11px', letter​​​​​​​​​​​​​​​​
+        {/* HISTORY */}
+        {activeTab === 'history' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {history.map(s => (
+              <div key={s.id} style={{ background: 'rgba(20,20,20,0.9)', borderRadius: '24px', padding: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ fontWeight: 700, marginBottom: '10px' }}>{s.date}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {s.players?.map((p, idx) => (
+                    <div key={idx} style={{ fontSize: '11px', background: '#000', padding: '4px 8px', borderRadius: '8px', border: '1px solid #222' }}>
+                      {p.name}: <span style={{ color: p.net >= 0 ? '#5DD88A' : '#E74C3C' }}>{p.net > 0 ? '+' : ''}{p.net}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* FOOTER NAV */}
+      <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'rgba(6,6,6,0.94)', backdropFilter: 'blur(32px)', padding: '16px 40px 32px', display: 'flex', justifyContent: 'space-between', zIndex: 150 }}>
+        <button onClick={() => setActiveTab('dashboard')} style={{ background: 'none', border: 'none', color: activeTab === 'dashboard' ? '#C9A84C' : '#333' }}><LayoutDashboard /></button>
+        <button onClick={() => setActiveTab('live')} style={{ background: activeTab === 'live' ? '#27AE60' : '#111', padding: '15px', borderRadius: '50%', marginTop: '-30px', border: '5px solid #080808' }}><PlayCircle color="white" /></button>
+        <button onClick={() => setActiveTab('history')} style={{ background: 'none', border: 'none', color: activeTab === 'history' ? '#C9A84C' : '#333' }}><History /></button>
+      </nav>
+
+      {/* ONBOARD MODAL */}
+      {showOnboardModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#111', padding: '30px', borderRadius: '30px', width: '100%', maxWidth: '400px' }}>
+            <h3 style={{ marginBottom: '20px' }}>Add Player</h3>
+            <input autoFocus value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} placeholder="Name" style={{ width: '100%', background: '#000', border: '1px solid #333', padding: '15px', borderRadius: '15px', color: 'white', marginBottom: '20px' }} />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowOnboardModal(false)} style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#222' }}>Cancel</button>
+              <button onClick={handleOnboard} style={{ flex: 1, padding: '12px', borderRadius: '12px', background: '#C9A84C', color: 'black' }}>Add</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
