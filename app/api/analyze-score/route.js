@@ -5,24 +5,14 @@ export async function POST(req) {
   try {
     const { message, history, image } = await req.json();
     
-    // Choose model based on whether an image is provided
+    // Llama 4 Scout handles both, but we specify for clarity
     const selectedModel = image ? AI_CONFIG.VISION_MODEL : AI_CONFIG.TEXT_MODEL;
 
-    // Strong instructions for poker sheet analysis
-    const systemPrompt = `You are "ChillBoyz AI", a specialized Poker Assistant for KT's group.
-    
-    CORE LOGIC:
+    const systemPrompt = `You are "SSC Score AI", a specialized Poker Assistant.
     1. Buy-in unit is $${AI_CONFIG.BUY_IN_AMOUNT}.
-    2. IMAGE ANALYSIS: Look for player names. Count the number of "20"s or checkmarks next to them.
-    3. THE LINE RULE: If you see a horizontal line drawn after the buy-ins, the number immediately following that line is the player's FINAL CASHOUT.
-    4. NET CALCULATION: Net = Cashout - (Buyins * ${AI_CONFIG.BUY_IN_AMOUNT}).
-    
-    RESPONSE FORMAT:
-    - Reply naturally in text.
-    - If you identify session data or are asked to start a session, you MUST append the data at the end of your reply in this EXACT format:
-      START_DATA{"players": [{"name": "PlayerName", "buyins": 2, "cashout": 150}]}END_DATA
-    
-    Keep the tone friendly and use "మామ" (Mama) occasionally as you are a close assistant to KT.`;
+    2. Identify players and buy-ins. If a line is drawn, the following number is the cashout.
+    3. IMPORTANT: Wrap data in START_DATA{"players": [...]}END_DATA at the end.
+    Tone: Professional yet friendly, addressing the user as "మామ" (Mama).`;
 
     const messages = [
       { role: "system", content: systemPrompt },
@@ -30,10 +20,7 @@ export async function POST(req) {
       { 
         role: "user", 
         content: image 
-          ? [
-              { type: "text", text: message || "Please analyze this poker score sheet." },
-              { type: "image_url", image_url: { url: image } }
-            ] 
+          ? [{ type: "text", text: message || "Analyze this score sheet." }, { type: "image_url", image_url: { url: image } }] 
           : message 
       }
     ];
@@ -47,26 +34,15 @@ export async function POST(req) {
       body: JSON.stringify({
         model: selectedModel,
         messages: messages,
-        temperature: 0.2, // Lower temperature for more accurate data extraction
-        max_tokens: 1024
+        temperature: 0.1
       })
     });
 
     const result = await response.json();
-
-    if (result.error) {
-      console.error("Groq API Error:", result.error);
-      return NextResponse.json({ error: result.error.message }, { status: 500 });
-    }
-
-    if (!result.choices || result.choices.length === 0) {
-      return NextResponse.json({ error: "No response from AI model" }, { status: 500 });
-    }
+    if (result.error) throw new Error(result.error.message);
 
     return NextResponse.json({ reply: result.choices[0].message.content });
-
   } catch (error) {
-    console.error("Server Crash:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
