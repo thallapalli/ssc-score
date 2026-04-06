@@ -2,11 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../lib/firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, writeBatch } from 'firebase/firestore';
-import { LayoutDashboard, PlayCircle, History, UserPlus, Save, TrendingUp, Wallet, CheckCircle2 } from 'lucide-react';
+import { LayoutDashboard, PlayCircle, History, UserPlus, Wallet, TrendingUp, Clock, AlertCircle } from 'lucide-react';
 
 const BUY_IN_UNIT = 20;
 
-export default function SSCScoreApp() {
+export default function SSCScoreFinal() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isLive, setIsLive] = useState(false);
   const [showSettleModal, setShowSettleModal] = useState(false);
@@ -16,7 +16,6 @@ export default function SSCScoreApp() {
   const [roster, setRoster] = useState([]);
   const [activePlayers, setActivePlayers] = useState([]);
 
-  // Firebase Real-time Sync
   useEffect(() => {
     const unsubRoster = onSnapshot(query(collection(db, 'roster'), orderBy('name', 'asc')), snap =>
       setRoster(snap.docs.map(d => ({ id: d.id, ...d.data() })))
@@ -29,7 +28,7 @@ export default function SSCScoreApp() {
 
   const totalNet = activePlayers.reduce((acc, p) => acc + (Number(p.cashout || 0) - p.buyins * BUY_IN_UNIT), 0);
 
-  // Stats for Dashboard (Unsettled Sessions only)
+  // Stats for Dashboard (Only Unsettled)
   const getUnsettledStats = () => {
     const stats = {};
     history.filter(s => s.status === 'unsettled').forEach(s => {
@@ -43,11 +42,23 @@ export default function SSCScoreApp() {
     return Object.entries(stats).sort((a, b) => b[1].net - a[1].net);
   };
 
+  // Grouping History by Date for Game 1, Game 2
+  const getGroupedHistory = () => {
+    const groups = {};
+    // Reverse to process chronologically for numbering
+    [...history].reverse().forEach(session => {
+      if (!session.timestamp) return;
+      const dateKey = session.timestamp.toDate().toLocaleDateString();
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(session);
+    });
+    return groups;
+  };
+
   const handleOnboard = async () => {
     if (!newPlayerName.trim()) return;
     await addDoc(collection(db, 'roster'), { name: newPlayerName.trim(), createdAt: serverTimestamp() });
-    setNewPlayerName('');
-    setShowOnboardModal(false);
+    setNewPlayerName(''); setShowOnboardModal(false);
   };
 
   const handleSaveSession = async (resolutionType = 'none') => {
@@ -67,7 +78,6 @@ export default function SSCScoreApp() {
 
     const sessionData = {
       timestamp: serverTimestamp(),
-      date: new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
       status: 'unsettled',
       players: finalPlayers.map(p => ({
         name: p.name,
@@ -88,145 +98,136 @@ export default function SSCScoreApp() {
     const batch = writeBatch(db);
     unsettled.forEach(s => batch.update(doc(db, 'sessions', s.id), { status: 'settled' }));
     await batch.commit();
-    alert('Season Settled! All data archived.');
+    alert('All sessions settled and archived!');
   };
 
+  const groupedHistory = getGroupedHistory();
+
   return (
-    <div style={{ minHeight: '100vh', background: '#080808', color: '#F0EAD6', paddingBottom: '120px', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#080808', color: '#F0EAD6', paddingBottom: '100px', fontFamily: 'sans-serif' }}>
       
       {/* HEADER */}
-      <header style={{ padding: '16px 20px', background: 'rgba(8,8,8,0.95)', borderBottom: '1px solid rgba(201,168,76,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100 }}>
-        <div>
-           <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 900, background: 'linear-gradient(135deg, #E8C96B, #8A6E2F)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>SSC SCORE</h1>
-           <div style={{ fontSize: '9px', color: '#8A8070', letterSpacing: '2px' }}>POKER LEDGER</div>
-        </div>
-        <button onClick={() => setShowOnboardModal(true)} style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid #C9A84C', padding: '8px', borderRadius: '10px' }}>
-          <UserPlus size={18} color="#C9A84C" />
+      <header style={{ padding: '20px', background: '#080808', borderBottom: '1px solid #222', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50 }}>
+        <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '900', color: '#C9A84C' }}>SSC SCORE</h1>
+        <button onClick={() => setShowOnboardModal(true)} style={{ background: '#111', border: '1px solid #333', padding: '8px', borderRadius: '10px' }}>
+          <UserPlus size={20} color="#C9A84C" />
         </button>
       </header>
 
-      <main style={{ padding: '20px', maxWidth: '480px', margin: '0 auto' }}>
+      <main style={{ padding: '20px', maxWidth: '500px', margin: '0 auto' }}>
         
-        {/* DASHBOARD: SEASON STATS */}
+        {/* DASHBOARD */}
         {activeTab === 'dashboard' && (
-          <div className="fade-in">
+          <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <TrendingUp size={16} color="#C9A84C" />
-                <span style={{ fontSize: '12px', fontWeight: 'bold' }}>UNSETTLED SEASON</span>
-              </div>
+              <span style={{ fontSize: '12px', color: '#8A8070', fontWeight: 'bold' }}>UNSETTLED SEASON STATS</span>
               {getUnsettledStats().length > 0 && (
-                <button onClick={batchSettleAll} style={{ background: '#C9A84C', color: '#000', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>SETTLE ALL</button>
+                <button onClick={batchSettleAll} style={{ background: '#C9A84C', color: '#000', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 'bold', border: 'none' }}>SETTLE ALL</button>
               )}
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {getUnsettledStats().map(([name, data]) => (
-                <div key={name} style={{ background: 'linear-gradient(135deg, #111, #0a0a0a)', border: '1px solid #222', padding: '16px', borderRadius: '18px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{name}</span>
-                    <span style={{ fontSize: '22px', fontWeight: '900', color: data.net >= 0 ? '#5DD88A' : '#E74C3C' }}>
-                      {data.net > 0 ? '+' : ''}{data.net.toFixed(0)}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '15px', marginTop: '10px', opacity: 0.6, fontSize: '12px', borderTop: '1px solid #1a1a1a', paddingTop: '8px' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Wallet size={12} /> Total In: ${data.totalBuyIn}</span>
-                    <span>Games: {data.sessions}</span>
-                  </div>
+            {getUnsettledStats().map(([name, data]) => (
+              <div key={name} style={{ background: '#111', padding: '16px', borderRadius: '15px', marginBottom: '12px', border: '1px solid #222' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{name}</span>
+                  <span style={{ fontSize: '20px', fontWeight: '900', color: data.net >= 0 ? '#5DD88A' : '#E74C3C' }}>
+                    {data.net > 0 ? '+' : ''}{data.net.toFixed(0)}
+                  </span>
                 </div>
-              ))}
-              {getUnsettledStats().length === 0 && <div style={{ textAlign: 'center', padding: '40px', opacity: 0.4 }}>No pending sessions.</div>}
-            </div>
+                <div style={{ fontSize: '12px', color: '#8A8070', marginTop: '8px', display: 'flex', gap: '15px' }}>
+                  <span>Total In: <strong>${data.totalBuyIn}</strong></span>
+                  <span>Games: <strong>{data.sessions}</strong></span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* LIVE SESSION: THE CORE ENGINE */}
+        {/* LIVE SESSION */}
         {activeTab === 'live' && (
-          <div className="fade-in">
+          <div>
             {!isLive ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <h3 style={{ fontSize: '14px', color: '#8A8070' }}>Select Players for Tonight</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  {roster.map(p => {
-                    const isSelected = activePlayers.find(ap => ap.id === p.id);
-                    return (
-                      <button key={p.id} onClick={() => isSelected ? setActivePlayers(activePlayers.filter(ap => ap.id !== p.id)) : setActivePlayers([...activePlayers, { ...p, buyins: 1, cashout: 0 }])}
-                        style={{ padding: '18px', borderRadius: '15px', background: isSelected ? 'linear-gradient(135deg, #E8C96B, #C9A84C)' : '#111', color: isSelected ? '#000' : '#8A8070', border: '1px solid #222', fontWeight: 'bold', cursor: 'pointer' }}>
-                        {p.name}
-                      </button>
-                    );
-                  })}
-                </div>
-                <button onClick={() => setIsLive(true)} disabled={activePlayers.length === 0}
-                  style={{ marginTop: '10px', padding: '20px', borderRadius: '18px', background: activePlayers.length > 0 ? '#27AE60' : '#222', color: 'white', fontWeight: '900', border: 'none', cursor: 'pointer' }}>
-                  START SESSION
-                </button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                {roster.map(p => {
+                  const selected = activePlayers.find(ap => ap.id === p.id);
+                  return (
+                    <button key={p.id} onClick={() => selected ? setActivePlayers(activePlayers.filter(ap => ap.id !== p.id)) : setActivePlayers([...activePlayers, { ...p, buyins: 1, cashout: 0 }])}
+                      style={{ padding: '15px', borderRadius: '12px', background: selected ? '#C9A84C' : '#111', color: selected ? '#000' : '#8A8070', border: '1px solid #222', fontWeight: 'bold' }}>
+                      {p.name}
+                    </button>
+                  );
+                })}
+                <button onClick={() => setIsLive(true)} disabled={activePlayers.length === 0} style={{ gridColumn: 'span 2', padding: '20px', background: '#27AE60', borderRadius: '15px', fontWeight: 'bold', marginTop: '10px', border: 'none', color: 'white' }}>START SESSION</button>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <div style={{ background: Math.abs(totalNet) < 0.1 ? '#1E4A35' : '#3d100d', padding: '15px', borderRadius: '15px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.1)' }}>
-                   <div style={{ fontSize: '10px', opacity: 0.7 }}>BALANCE STATUS</div>
-                   <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{totalNet === 0 ? '✓ MATCHED' : `$${totalNet.toFixed(2)}`}</div>
+                <div style={{ background: Math.abs(totalNet) < 0.1 ? '#1E4A35' : '#3d100d', padding: '15px', borderRadius: '12px', textAlign: 'center' }}>
+                  <span style={{ fontSize: '12px' }}>Balance Status</span>
+                  <div style={{ fontSize: '22px', fontWeight: 'bold' }}>{totalNet === 0 ? '✓ Matched' : `$${totalNet.toFixed(2)}`}</div>
                 </div>
-
                 {activePlayers.map((p, i) => (
-                  <div key={p.id} style={{ background: '#111', padding: '20px', borderRadius: '20px', border: '1px solid #222' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                      <span style={{ fontSize: '18px', fontWeight: 'bold' }}>{p.name}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#000', padding: '6px 12px', borderRadius: '10px' }}>
-                        <button onClick={() => { let a = [...activePlayers]; a[i].buyins = Math.max(1, a[i].buyins - 1); setActivePlayers(a); }} style={{ background: 'none', border: 'none', color: '#C9A84C', fontSize: '20px' }}>-</button>
-                        <span style={{ fontWeight: 'bold' }}>{p.buyins}</span>
-                        <button onClick={() => { let a = [...activePlayers]; a[i].buyins++; setActivePlayers(a); }} style={{ background: 'none', border: 'none', color: '#C9A84C', fontSize: '20px' }}>+</button>
+                  <div key={p.id} style={{ background: '#111', padding: '15px', borderRadius: '15px', border: '1px solid #222' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                      <span style={{ fontWeight: 'bold' }}>{p.name} (${p.buyins * BUY_IN_UNIT})</span>
+                      <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                        <button onClick={() => { let a = [...activePlayers]; a[i].buyins = Math.max(1, a[i].buyins - 1); setActivePlayers(a); }} style={{ color: '#C9A84C', fontSize: '20px', background: 'none', border: 'none' }}>-</button>
+                        <span>{p.buyins}</span>
+                        <button onClick={() => { let a = [...activePlayers]; a[i].buyins++; setActivePlayers(a); }} style={{ color: '#C9A84C', fontSize: '20px', background: 'none', border: 'none' }}>+</button>
                       </div>
                     </div>
-                    <div style={{ position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: '12px', top: '12px', opacity: 0.4 }}>$</span>
-                      <input type="number" placeholder="0.00" onChange={e => { let a = [...activePlayers]; a[i].cashout = e.target.value; setActivePlayers(a); }}
-                        style={{ width: '100%', background: '#000', border: '1px solid #333', padding: '12px 12px 12px 25px', borderRadius: '10px', color: 'white', fontSize: '18px' }} />
-                    </div>
+                    <input type="number" placeholder="Cashout amount" onChange={e => { let a = [...activePlayers]; a[i].cashout = e.target.value; setActivePlayers(a); }} style={{ width: '100%', background: '#000', border: '1px solid #333', padding: '12px', borderRadius: '10px', color: 'white' }} />
                   </div>
                 ))}
-
-                <button onClick={() => Math.abs(totalNet) < 0.1 ? handleSaveSession() : setShowSettleModal(true)}
-                  style={{ padding: '20px', background: '#C9A84C', color: '#000', borderRadius: '18px', fontWeight: '900', border: 'none' }}>
-                  END & SAVE SESSION
-                </button>
+                <button onClick={() => Math.abs(totalNet) < 0.1 ? handleSaveSession() : setShowSettleModal(true)} style={{ padding: '20px', background: '#C9A84C', color: '#000', borderRadius: '15px', fontWeight: 'bold', border: 'none' }}>END SESSION</button>
               </div>
             )}
           </div>
         )}
 
-        {/* HISTORY: PAST LOGS */}
+        {/* HISTORY */}
         {activeTab === 'history' && (
-          <div className="fade-in">
-            {history.map(s => (
-              <div key={s.id} style={{ background: '#111', padding: '16px', borderRadius: '15px', marginBottom: '12px', borderLeft: s.status === 'unsettled' ? '4px solid #C9A84C' : '4px solid #27AE60' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', opacity: 0.5, marginBottom: '8px' }}>
-                  <span>{s.date}</span>
-                  <span>{s.status.toUpperCase()}</span>
+          <div>
+            {Object.keys(groupedHistory).reverse().map(date => (
+              <div key={date} style={{ marginBottom: '25px' }}>
+                <div style={{ fontSize: '13px', color: '#C9A84C', fontWeight: 'bold', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Clock size={14} /> {date}
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {s.players.map(p => (
-                    <div key={p.name} style={{ background: '#000', padding: '4px 8px', borderRadius: '6px', fontSize: '12px' }}>
-                      {p.name}: <span style={{ color: p.net >= 0 ? '#5DD88A' : '#E74C3C' }}>{p.net > 0 ? '+' : ''}{p.net}</span>
+                {groupedHistory[date].map((session, idx) => (
+                  <div key={session.id} style={{ background: '#111', padding: '16px', borderRadius: '15px', marginBottom: '10px', borderLeft: session.status === 'unsettled' ? '4px solid #C9A84C' : '4px solid #27AE60' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', fontSize: '14px' }}>
+                      <span style={{ fontWeight: 'bold' }}>Game {idx + 1}</span>
+                      <span style={{ fontSize: '10px', opacity: 0.5 }}>{session.status.toUpperCase()}</span>
                     </div>
-                  ))}
-                </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      {session.players.map(p => (
+                        <div key={p.name} style={{ fontSize: '12px', color: '#8A8070' }}>
+                          {p.name}: <span style={{ color: p.net >= 0 ? '#5DD88A' : '#E74C3C' }}>{p.net >= 0 ? '+' : ''}{p.net.toFixed(0)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             ))}
           </div>
         )}
       </main>
 
-      {/* RESOLUTION MODAL */}
+      {/* FOOTER NAV */}
+      <nav style={{ position: 'fixed', bottom: 0, width: '100%', background: '#080808', display: 'flex', justifyContent: 'space-around', padding: '20px 0 35px', borderTop: '1px solid #222' }}>
+        <button onClick={() => setActiveTab('dashboard')} style={{ background: 'none', border: 'none' }}><LayoutDashboard color={activeTab === 'dashboard' ? '#C9A84C' : '#444'} /></button>
+        <button onClick={() => setActiveTab('live')} style={{ background: 'none', border: 'none' }}><PlayCircle color={activeTab === 'live' ? '#C9A84C' : '#444'} /></button>
+        <button onClick={() => setActiveTab('history')} style={{ background: 'none', border: 'none' }}><History color={activeTab === 'history' ? '#C9A84C' : '#444'} /></button>
+      </nav>
+
+      {/* SETTLE OPTIONS MODAL */}
       {showSettleModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 }}>
-          <div style={{ background: '#111', padding: '30px', borderRadius: '25px', width: '100%', border: '1px solid #333' }}>
-            <h2 style={{ color: '#E74C3C', marginTop: 0 }}>Mismatch!</h2>
-            <p style={{ opacity: 0.7, fontSize: '14px' }}>The table is off by <strong>${totalNet.toFixed(2)}</strong>. How do you want to fix it?</p>
-            <button onClick={() => handleSaveSession('split_equal')} style={{ width: '100%', padding: '15px', margin: '8px 0', background: '#222', color: 'white', border: '1px solid #444', borderRadius: '12px', fontWeight: 'bold' }}>Split Equally</button>
-            <button onClick={() => handleSaveSession('split_positives')} style={{ width: '100%', padding: '15px', margin: '8px 0', background: '#222', color: 'white', border: '1px solid #444', borderRadius: '12px', fontWeight: 'bold' }}>Split to Winners</button>
-            <button onClick={() => setShowSettleModal(false)} style={{ width: '100%', padding: '15px', margin: '8px 0', background: '#C9A84C', color: '#000', borderRadius: '12px', fontWeight: 'bold', border: 'none' }}>Re-edit Scores</button>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 }}>
+          <div style={{ background: '#111', padding: '25px', borderRadius: '20px', width: '100%', maxWidth: '400px' }}>
+            <h3 style={{ color: '#E74C3C', marginTop: 0 }}>Balance Mismatch!</h3>
+            <p style={{ fontSize: '14px', opacity: 0.8 }}>Difference: ${totalNet.toFixed(2)}</p>
+            <button onClick={() => handleSaveSession('split_equal')} style={{ width: '100%', padding: '15px', margin: '8px 0', background: '#222', borderRadius: '12px', color: 'white', border: '1px solid #444' }}>Split Equally</button>
+            <button onClick={() => handleSaveSession('split_positives')} style={{ width: '100%', padding: '15px', margin: '8px 0', background: '#222', borderRadius: '12px', color: 'white', border: '1px solid #444' }}>Split to Winners</button>
+            <button onClick={() => setShowSettleModal(false)} style={{ width: '100%', padding: '15px', margin: '8px 0', background: '#C9A84C', color: '#000', borderRadius: '12px', fontWeight: 'bold', border: 'none' }}>Go Back & Edit</button>
           </div>
         </div>
       )}
@@ -234,24 +235,16 @@ export default function SSCScoreApp() {
       {/* ONBOARD MODAL */}
       {showOnboardModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 }}>
-          <div style={{ background: '#111', padding: '30px', borderRadius: '25px', width: '100%' }}>
-            <h3>New Player</h3>
-            <input autoFocus value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} placeholder="Enter name"
-              style={{ width: '100%', padding: '15px', background: '#000', border: '1px solid #333', color: 'white', borderRadius: '12px', marginBottom: '15px' }} />
+          <div style={{ background: '#111', padding: '25px', borderRadius: '20px', width: '100%', maxWidth: '400px' }}>
+            <h3 style={{ marginTop: 0 }}>Add New Player</h3>
+            <input value={newPlayerName} onChange={e => setNewPlayerName(e.target.value)} placeholder="Player name" style={{ width: '100%', padding: '15px', background: '#000', border: '1px solid #333', color: 'white', borderRadius: '12px', marginBottom: '20px' }} />
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => setShowOnboardModal(false)} style={{ flex: 1, padding: '12px', background: '#222', borderRadius: '10px', color: 'white', border: 'none' }}>Cancel</button>
-              <button onClick={handleOnboard} style={{ flex: 1, padding: '12px', background: '#C9A84C', borderRadius: '10px', color: '#000', border: 'none', fontWeight: 'bold' }}>Add</button>
+              <button onClick={handleOnboard} style={{ flex: 1, padding: '12px', background: '#C9A84C', borderRadius: '10px', color: '#000', fontWeight: 'bold', border: 'none' }}>Add Player</button>
             </div>
           </div>
         </div>
       )}
-
-      {/* FOOTER NAV */}
-      <nav style={{ position: 'fixed', bottom: 0, width: '100%', background: 'rgba(10,10,10,0.98)', borderTop: '1px solid #222', display: 'flex', justifyContent: 'space-around', padding: '15px 0 35px' }}>
-        <button onClick={() => setActiveTab('dashboard')} style={{ background: 'none', border: 'none' }}><LayoutDashboard color={activeTab === 'dashboard' ? '#C9A84C' : '#444'} /></button>
-        <button onClick={() => setActiveTab('live')} style={{ background: 'none', border: 'none' }}><PlayCircle color={activeTab === 'live' ? '#C9A84C' : '#444'} /></button>
-        <button onClick={() => setActiveTab('history')} style={{ background: 'none', border: 'none' }}><History color={activeTab === 'history' ? '#C9A84C' : '#444'} /></button>
-      </nav>
     </div>
   );
 }
